@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ข้อมูลกลุ่มเกษตรกรเข้มแข็งที่มีผลงานดีเด่น - กรมพัฒนาที่ดิน</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+      
+      /* การตั้งค่าพื้นหลังสไตล์ GAP */
+      body { 
+        font-family: 'Sarabun', sans-serif; 
+        background: linear-gradient(135deg, #f4f7f6 0%, #e8ecef 100%);
+      }
+      body::before {
+        content: ""; position: fixed; top: -50px; right: -50px; width: 300px; height: 300px;
+        background-image: url('https://www.transparenttextures.com/patterns/leaves.png');
+        opacity: 0.05; pointer-events: none; z-index: 0;
+      }
+      
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      
+      .table-container { max-height: calc(100vh - 400px); }
+      .table-container::-webkit-scrollbar { width: 10px; height: 10px; }
+      .table-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 6px; }
+      .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 2px solid #f1f5f9; }
+      .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+      .google-visualization-tooltip { 
+        font-family: 'Sarabun', sans-serif !important; 
+        padding: 12px !important; 
+        border-radius: 8px !important; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; 
+        border: 1px solid #e2e8f0 !important;
+        background-color: white !important;
+        z-index: 50 !important;
+      }
+      ul.google-visualization-tooltip-item-list { margin: 0 !important; padding: 0 !important; list-style: none !important; }
+      .google-visualization-tooltip-item:first-child { display: none !important; }
+
+      /* ================================== 
+         สไตล์การ์ดข้อมูลและกราฟ (จาก GAP) 
+      ==================================== */
+      .styled-card {
+        background: linear-gradient(180deg, #ffffff 0%, #f1f8e9 100%);
+        border-radius: 15px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+        border: 1px solid rgba(255,255,255,0.8);
+      }
+      
+      .styled-table-card {
+        background: linear-gradient(180deg, #ffffff 0%, #f9fbe7 100%);
+        border-radius: 15px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+        border-top: 5px solid #265932;
+      }
+
+      .map-pattern::before {
+        content: ""; position: absolute; top: 10%; left: 5%; width: 90%; height: 80%;
+        background-image: url('https://www.transparenttextures.com/patterns/antique-paper.png'); 
+        opacity: 0.05; pointer-events: none;
+      }
+
+      .custom-thead th {
+        background-color: #265932 !important;
+        color: #fffdf2 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+      }
+    </style>
+  </head>
+  <body class="h-screen overflow-hidden flex flex-row text-slate-800 relative">
+
+    <aside class="w-64 bg-emerald-900 text-white flex flex-col flex-shrink-0 h-full shadow-xl z-20 overflow-y-auto no-scrollbar relative">
+      <div class="p-6 flex flex-col items-center border-b border-emerald-800 text-center">
+        <img src="https://i.postimg.cc/bwcsRRSm/sanea-khxng-loko-GAP-(2).png" alt="Logo" class="w-24 h-24 bg-white rounded-full p-1 object-contain mb-3 shadow-md">
+        <h2 class="text-sm font-bold tracking-wide leading-relaxed">ข้อมูลกลุ่มเกษตรกรเข้มแข็ง<br>ที่มีผลงานดีเด่น</h2>
+        <p class="text-[10px] text-emerald-300 opacity-80 mt-1">Land Development Department</p>
+      </div>
+
+      <div class="p-4 flex-1 space-y-4 text-xs">
+        <div>
+          <label class="block text-emerald-300 font-medium mb-1"><i class="fa-solid fa-users-gear mr-1"></i> ค้นหาชื่อกลุ่ม:</label>
+          <input id="search-group" type="text" placeholder="พิมพ์ชื่อกลุ่ม..." class="w-full bg-white text-slate-800 rounded px-3 py-2 border-none outline-none focus:ring-2 focus:ring-emerald-400 shadow-inner">
+        </div>
+        <div>
+          <label class="block text-emerald-300 font-medium mb-1"><i class="fa-solid fa-user mr-1"></i> ค้นหาชื่อเกษตรกร:</label>
+          <input id="search-farmer" type="text" placeholder="พิมพ์ชื่อเกษตรกร..." class="w-full bg-white text-slate-800 rounded px-3 py-2 border-none outline-none focus:ring-2 focus:ring-emerald-400 shadow-inner">
+        </div>
+        <div class="border-t border-emerald-800 pt-3">
+          <label class="block text-emerald-300 font-medium mb-1"><i class="fa-solid fa-building mr-1"></i> สังกัด สพข.:</label>
+          <select id="filter-spk" class="w-full bg-white text-slate-800 rounded px-2 py-2 border-none outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer shadow-inner">
+            <option value="">-- ทุกหน่วยงาน (สพข.) --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-emerald-300 font-medium mb-1"><i class="fa-solid fa-location-dot mr-1"></i> จังหวัด สพด.:</label>
+          <select id="filter-spd" class="w-full bg-white text-slate-800 rounded px-2 py-2 border-none outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer shadow-inner">
+            <option value="">-- ทุก สพด. (77 จังหวัด) --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-emerald-300 font-medium mb-1"><i class="fa-solid fa-calendar-days mr-1"></i> ปีงบประมาณ:</label>
+          <select id="filter-year" class="w-full bg-white text-slate-800 rounded px-2 py-2 border-none outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer shadow-inner">
+            <option value="">-- ทุกปีงบประมาณ --</option>
+            <option value="none">ไม่ระบุ (-)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="p-4 space-y-2 border-t border-emerald-800 bg-emerald-950">
+        <button id="btn-reset" class="w-full bg-amber-700 hover:bg-amber-600 transition text-white py-2 px-4 rounded text-xs font-medium flex items-center justify-center gap-2 shadow">
+          <i class="fa-solid fa-rotate-left"></i> ล้างตัวกรอง
+        </button>
+        <button id="btn-export" class="w-full bg-emerald-600 hover:bg-emerald-500 transition text-white py-2 px-4 rounded text-xs font-medium flex items-center justify-center gap-2 shadow">
+          <i class="fa-solid fa-file-excel"></i> ดาวน์โหลด Excel
+        </button>
+      </div>
+    </aside>
+
+    <main class="flex-1 h-full overflow-y-auto flex flex-col bg-transparent relative z-10">
+      <header class="bg-white/90 backdrop-blur border-b border-slate-200 px-6 py-4 shadow-sm flex-shrink-0 sticky top-0 z-20">
+        <h1 class="text-xl md:text-2xl font-bold text-[#1b4321] tracking-wide">
+          ข้อมูลกลุ่มเกษตรกรเข้มแข็งที่มีผลงานดีเด่น
+        </h1>
+      </header>
+
+      <div class="p-6 space-y-6 flex-1">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-gradient-to-br from-blue-600 to-blue-500 rounded-xl shadow-md p-6 flex items-center justify-between text-white border border-blue-400 transform transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+            <div>
+              <p class="text-sm text-blue-100 font-medium mb-1 drop-shadow-sm">จำนวนกลุ่มเกษตรกร (กลุ่ม)</p>
+              <h3 class="text-4xl font-bold drop-shadow-md" id="kpi-groups"><i class="fa-solid fa-spinner fa-spin text-2xl opacity-50"></i></h3>
+            </div>
+            <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl shadow-inner backdrop-blur-sm"><i class="fa-solid fa-users-rectangle"></i></div>
+          </div>
+          <div class="bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-xl shadow-md p-6 flex items-center justify-between text-white border border-emerald-400 transform transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+            <div>
+              <p class="text-sm text-emerald-100 font-medium mb-1 drop-shadow-sm">สมาชิกรวม (ราย)</p>
+              <h3 class="text-4xl font-bold drop-shadow-md" id="kpi-farmers"><i class="fa-solid fa-spinner fa-spin text-2xl opacity-50"></i></h3>
+            </div>
+            <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl shadow-inner backdrop-blur-sm"><i class="fa-solid fa-user-check"></i></div>
+          </div>
+        </div>
+
+        <div id="data-status" class="py-3 px-4 text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 text-xs font-medium flex items-center gap-2 animate-pulse shadow-sm">
+          <i class="fa-solid fa-circle-notch animate-spin text-sm"></i> กำลังดึงข้อมูลจาก Google Sheets...
+        </div>
+
+        <div class="styled-card p-6 flex flex-col relative">
+          <h4 class="text-sm font-semibold text-[#1b4321] mb-4 border-b border-emerald-100 pb-2 flex justify-between">
+            <span><i class="fa-solid fa-map-location-dot mr-2 text-emerald-600"></i>แผนที่พิกัดกระจายตัวกลุ่มเกษตรกร</span>
+            <span class="text-xs text-slate-400 font-normal"><i class="fa-solid fa-mouse mr-1"></i>เลื่อนลูกกลิ้งเพื่อซูม / คลิกค้างเพื่อลากเลื่อนแผนที่</span>
+          </h4>
+          
+          <div id="map_wrapper" class="w-full h-96 relative overflow-hidden map-pattern rounded-lg border border-emerald-100 select-none flex items-center justify-center bg-white/50">
+            <div class="absolute top-3 right-3 z-10 flex flex-col bg-white rounded shadow-md border border-slate-200">
+              <button id="btn-zoom-in" class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition border-b border-slate-200" title="ซูมเข้า"><i class="fa-solid fa-plus"></i></button>
+              <button id="btn-zoom-reset" class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition border-b border-slate-200" title="คืนค่าเดิม"><i class="fa-solid fa-compress"></i></button>
+              <button id="btn-zoom-out" class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition" title="ซูมออก"><i class="fa-solid fa-minus"></i></button>
+            </div>
+            
+            <div id="map_div" class="w-full max-w-[400px] mx-auto h-full cursor-grab" style="transform-origin: center center; transition: transform 0.2s ease-out;">
+              <span class="text-slate-400 text-sm flex items-center justify-center h-full w-full absolute top-0 left-0"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังเตรียมแผนที่...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="styled-card p-6 flex flex-col">
+            <h4 class="text-sm font-semibold text-[#1b4321] mb-4 border-b border-emerald-100 pb-2 flex justify-between">
+              <span><i class="fa-solid fa-chart-pie mr-2 text-emerald-600"></i>สัดส่วนสถานะของกลุ่มเกษตรกร (กลุ่ม)</span>
+            </h4>
+            <div id="status_chart_div" class="w-full h-80 relative flex items-center justify-center bg-white/50 rounded-lg border border-emerald-50">
+              <span class="text-slate-400 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังคำนวณและจัดเตรียมกราฟ...</span>
+            </div>
+          </div>
+
+          <div class="styled-card p-6 flex flex-col">
+            <h4 class="text-sm font-semibold text-[#1b4321] mb-4 border-b border-emerald-100 pb-2 flex justify-between">
+              <span><i class="fa-solid fa-chart-bar mr-2 text-emerald-600"></i>ชนิดพืช 10 อันดับแรก เปรียบเทียบกับจำนวนเกษตรกร (ราย)</span>
+            </h4>
+            <div id="crop_chart_div" class="w-full h-80 relative flex items-center justify-center bg-white/50 rounded-lg border border-emerald-50">
+              <span class="text-slate-400 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังคำนวณและจัดเตรียมกราฟ...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="styled-table-card p-6 flex flex-col">
+          <h4 class="text-sm font-semibold text-[#1b4321] mb-4 border-b border-emerald-100 pb-2 flex justify-between items-end">
+            <span><i class="fa-solid fa-table-list mr-2 text-emerald-600"></i>ตารางรายงานรายละเอียดข้อมูล</span>
+            <span id="result-count" class="text-xs font-normal text-slate-500">กำลังโหลด...</span>
+          </h4>
+          
+          <div class="overflow-auto border border-emerald-200/60 rounded-lg shadow-inner table-container relative bg-white">
+            <table class="w-full text-xs text-left whitespace-nowrap min-w-max">
+              <thead class="custom-thead sticky top-0 z-10 font-semibold shadow-md">
+                <tr>
+                  <th class="px-4 py-3">สพข.</th>
+                  <th class="px-4 py-3">สพด.</th>
+                  <th class="px-4 py-3 text-center">ลำดับของกลุ่ม</th>
+                  <th class="px-4 py-3 text-center">ลำดับสมาชิก</th>
+                  <th class="px-4 py-3">ชื่อกลุ่ม</th>
+                  <th class="px-4 py-3 text-center">ปีที่เข้าร่วม</th>
+                  <th class="px-4 py-3">สถานะของกลุ่ม</th>
+                  <th class="px-4 py-3 text-center">สถานะภายในกลุ่ม</th>
+                  <th class="px-4 py-3">รายชื่อสมาชิก</th>
+                  <th class="px-4 py-3">สถานะหมอดิน</th>
+                  <th class="px-4 py-3">ตำบล</th>
+                  <th class="px-4 py-3">อำเภอ</th>
+                  <th class="px-4 py-3">จังหวัด</th>
+                  <th class="px-4 py-3">ชนิดเกษตร</th>
+                </tr>
+              </thead>
+              <tbody id="table-body" class="divide-y divide-emerald-50 bg-white">
+                <tr>
+                  <td colspan="14" class="text-center py-16 text-emerald-600">
+                    <i class="fa-solid fa-cloud-arrow-down animate-bounce text-3xl mb-3 opacity-50"></i><br>
+                    กำลังโหลดข้อมูลและจัดเตรียมตาราง...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="text-[10px] text-slate-400 text-right mt-4 pt-2 border-t border-emerald-50">
+            กองวิจัยและพัฒนาการจัดการที่ดิน (ส่วนงานเทคโนโลยีสารสนเทศ)
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <script>
+      const provLatLng = {
+        "กรุงเทพมหานคร": [13.7563, 100.5018], "สมุทรปราการ": [13.5991, 100.5968], "นนทบุรี": [13.8591, 100.5217],
+        "ปทุมธานี": [14.0208, 100.5250], "พระนครศรีอยุธยา": [14.3516, 100.5774], "อ่างทอง": [14.5896, 100.4550],
+        "ลพบุรี": [14.7985, 100.6540], "สิงห์บุรี": [14.8936, 100.4047], "ชัยนาท": [15.1852, 100.1251],
+        "สระบุรี": [14.5289, 100.9101], "ชลบุรี": [13.3611, 100.9847], "ระยอง": [12.6814, 101.2816],
+        "จันทบุรี": [12.6114, 102.1039], "ตราด": [12.2428, 102.5175], "ฉะเชิงเทรา": [13.6904, 101.0718],
+        "ปราจีนบุรี": [14.0510, 101.3722], "นครนายก": [14.2069, 101.2131], "สระแก้ว": [13.8240, 102.0646],
+        "นครราชสีมา": [14.9799, 102.0978], "บุรีรัมย์": [14.9930, 103.1029], "สุรินทร์": [14.8818, 103.4936],
+        "ศรีสะเกษ": [15.1186, 104.3220], "อุบลราชธานี": [15.2448, 104.8473], "ยโสธร": [15.7926, 104.1453],
+        "ชัยภูมิ": [15.8068, 102.0315], "อำนาจเจริญ": [15.8663, 104.6258], "บึงกาฬ": [18.3605, 103.6516],
+        "หนองบัวลำภู": [17.2045, 102.4407], "ขอนแก่น": [16.4322, 102.8236], "อุดรธานี": [17.4138, 102.7872],
+        "เลย": [17.4860, 101.7223], "หนองคาย": [17.8783, 102.7420], "มหาสารคาม": [16.1853, 103.3013],
+        "ร้อยเอ็ด": [16.0538, 103.6520], "กาฬสินธุ์": [16.4328, 103.5065], "สกลนคร": [17.1664, 104.1486],
+        "นครพนม": [17.4048, 104.7811], "มุกดาหาร": [16.5436, 104.7206], "เชียงใหม่": [18.7953, 98.9620],
+        "ลำพูน": [18.5745, 99.0087], "ลำปาง": [18.2888, 99.4930], "อุตรดิตถ์": [17.6256, 100.0993],
+        "แพร่": [18.1446, 100.1403], "น่าน": [18.7756, 100.7730], "พะเยา": [19.1666, 99.9022],
+        "เชียงราย": [19.9105, 99.8406], "แม่ฮ่องสอน": [19.3020, 97.9654], "นครสวรรค์": [15.6961, 100.1226],
+        "อุทัยธานี": [15.3835, 100.0246], "กำแพงเพชร": [16.4828, 99.5227], "ตาก": [16.8840, 99.1258],
+        "สุโขทัย": [17.0116, 99.8251], "พิษณุโลก": [16.8211, 100.2587], "พิจิตร": [16.4419, 100.3488],
+        "เพชรบูรณ์": [16.4150, 101.1560], "ราชบุรี": [13.5283, 99.8128], "กาญจนบุรี": [14.0228, 99.5328],
+        "สุพรรณบุรี": [14.4742, 100.1123], "นครปฐม": [13.8199, 100.0668], "สมุทรสาคร": [13.5475, 100.2744],
+        "สมุทรสงคราม": [13.4140, 100.0011], "เพชรบุรี": [13.1119, 99.9447], "ประจวบคีรีขันธ์": [11.8105, 99.7971],
+        "นครศรีธรรมราช": [8.4304, 99.9631], "กระบี่": [8.0863, 98.9063], "พังงา": [8.4501, 98.5284],
+        "ภูเก็ต": [7.8804, 98.3923], "สุราษฎร์ธานี": [9.1342, 99.3334], "ระนอง": [9.9658, 98.6348],
+        "ชุมพร": [10.4930, 99.1800], "สงขลา": [7.1898, 100.5954], "สตูล": [6.6226, 100.0667],
+        "ตรัง": [7.5563, 99.6114], "พัทลุง": [7.6166, 100.0740], "ปัตตานี": [6.8660, 101.2501],
+        "ยะลา": [6.5411, 101.2804], "นราธิวาส": [6.4255, 101.8253]
+      };
+
+      const regionData = {
+        "1": ["ชัยนาท", "นครนายก", "นนทบุรี", "ปทุมธานี", "ลพบุรี", "สุพรรณบุรี", "พระนครศรีอยุธยา", "อ่างทอง", "สิงห์บุรี", "สระบุรี", "นครปฐม", "สมุทรปราการ", "กรุงเทพมหานคร"],
+        "2": ["จันทบุรี", "ฉะเชิงเทรา", "ชลบุรี", "ตราด", "ระยอง", "สระแก้ว", "ปราจีนบุรี"],
+        "3": ["ชัยภูมิ", "นครราชสีมา", "บุรีรัมย์", "สุรินทร์"],
+        "4": ["นครพนม", "อำนาจเจริญ", "อุบลราชธานี", "ร้อยเอ็ด", "ศรีสะเกษ", "มุกดาหาร", "ยโสธร"],
+        "5": ["ขอนแก่น", "อุดรธานี", "มหาสารคาม", "หนองคาย", "หนองบัวลำภู", "กาฬสินธุ์", "สกลนคร", "บึงกาฬ"],
+        "6": ["เชียงใหม่", "แม่ฮ่องสอน", "ลำพูน", "ลำปาง"],
+        "7": ["น่าน", "เชียงราย", "แพร่", "พะเยา"],
+        "8": ["พิษณุโลก", "อุตรดิตถ์", "เพชรบูรณ์", "เลย", "พิจิตร"],
+        "9": ["นครสวรรค์", "ตาก", "กำแพงเพชร", "อุทัยธานี", "สุโขทัย"],
+        "10": ["ราชบุรี", "กาญจนบุรี", "เพชรบุรี", "สมุทรสาคร", "สมุทรสงคราม", "ประจวบคีรีขันธ์"],
+        "11": ["สุราษฎร์ธานี", "ระนอง", "พังงา", "นครศรีธรรมราช", "ชุมพร", "กระบี่", "ภูเก็ต"],
+        "12": ["สงขลา", "สตูล", "ปัตตานี", "ยะลา", "พัทลุง", "นราธิวาส", "ตรัง"]
+      };
+
+      const allProvinces = Object.values(regionData).flat().sort((a, b) => a.localeCompare(b, 'th'));
+
+      const searchGroup = document.getElementById('search-group');
+      const searchFarmer = document.getElementById('search-farmer');
+      const spkSelect = document.getElementById('filter-spk');
+      const spdSelect = document.getElementById('filter-spd');
+      const yearSelect = document.getElementById('filter-year');
+      
+      let globalData = []; 
+      let currentFilteredData = []; 
+      let isMapReady = false; 
+
+      let mapZoom = 1;
+      let mapPanX = 0;
+      let mapPanY = 0;
+      let isMapDragging = false;
+      let mapStartX = 0;
+      let mapStartY = 0;
+
+      function initMapZoomControl() {
+        const mapWrapper = document.getElementById('map_wrapper');
+        const mapDiv = document.getElementById('map_div');
+        function applyTransform(smooth = true) {
+          mapDiv.style.transition = smooth ? 'transform 0.2s ease-out' : 'none';
+          mapDiv.style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapZoom})`;
+        }
+        document.getElementById('btn-zoom-in').addEventListener('click', () => { mapZoom = Math.min(mapZoom + 0.5, 6); applyTransform(); });
+        document.getElementById('btn-zoom-out').addEventListener('click', () => { mapZoom = Math.max(mapZoom - 0.5, 1); if (mapZoom === 1) { mapPanX = 0; mapPanY = 0; } applyTransform(); });
+        document.getElementById('btn-zoom-reset').addEventListener('click', () => { mapZoom = 1; mapPanX = 0; mapPanY = 0; applyTransform(); });
+        mapWrapper.addEventListener('wheel', (e) => {
+          e.preventDefault(); 
+          if (e.deltaY < 0) mapZoom = Math.min(mapZoom + 0.25, 6);
+          else mapZoom = Math.max(mapZoom - 0.25, 1);
+          if (mapZoom === 1) { mapPanX = 0; mapPanY = 0; }
+          applyTransform();
+        }, { passive: false });
+
+        mapWrapper.addEventListener('mousedown', (e) => {
+          if (mapZoom > 1) {
+            isMapDragging = true; mapStartX = e.clientX - mapPanX; mapStartY = e.clientY - mapPanY;
+            mapDiv.classList.remove('cursor-grab'); mapDiv.classList.add('cursor-grabbing');
+          }
+        });
+        mapWrapper.addEventListener('mousemove', (e) => {
+          if (!isMapDragging) return;
+          mapPanX = e.clientX - mapStartX; mapPanY = e.clientY - mapStartY; applyTransform(false); 
+        });
+        const stopDrag = () => {
+          if (isMapDragging) {
+            isMapDragging = false; mapDiv.classList.remove('cursor-grabbing'); mapDiv.classList.add('cursor-grab'); applyTransform(true);
+          }
+        };
+        mapWrapper.addEventListener('mouseup', stopDrag);
+        mapWrapper.addEventListener('mouseleave', stopDrag);
+      }
+
+      google.charts.load('current', { 'packages':['geochart', 'corechart'] });
+      google.charts.setOnLoadCallback(function() {
+        isMapReady = true;
+        if(globalData.length > 0) applyFilters(); 
+      });
+
+      for (let i = 1; i <= 12; i++) {
+        let opt = document.createElement('option'); opt.value = i; opt.textContent = `สพข.${i}`; spkSelect.appendChild(opt);
+      }
+
+      function populateSpd(regionId) {
+        spdSelect.innerHTML = '<option value="">-- ทุก สพด. (77 จังหวัด) --</option>';
+        let provincesToShow = (regionId && regionData[regionId]) ? regionData[regionId] : allProvinces;
+        provincesToShow.forEach(prov => {
+          let opt = document.createElement('option'); opt.value = prov; opt.textContent = `สพด.${prov}`; spdSelect.appendChild(opt);
+        });
+      }
+
+      const currentYearBE = new Date().getFullYear() + 543;
+      for (let y = currentYearBE; y >= 2550; y--) {
+        let opt = document.createElement('option'); opt.value = y; opt.textContent = y; yearSelect.appendChild(opt);
+      }
+
+      spkSelect.addEventListener('change', function() { populateSpd(this.value); applyFilters(); });
+      populateSpd("");
+
+      function drawMap(mapPointsArray) {
+        if (!isMapReady) return;
+        var mapData = new google.visualization.DataTable();
+        mapData.addColumn('number', 'Latitude'); mapData.addColumn('number', 'Longitude');
+        mapData.addColumn('string', 'Label'); mapData.addColumn('number', 'Color'); mapData.addColumn('number', 'Size');   
+        mapData.addColumn({'type': 'string', 'role': 'tooltip', 'p': {'html': true}}); 
+
+        let hasData = false;
+        mapPointsArray.forEach(group => {
+          if (provLatLng[group.prov]) {
+            hasData = true;
+            let coords = provLatLng[group.prov];
+            let latJitter = (Math.random() - 0.5) * 0.4; 
+            let lngJitter = (Math.random() - 0.5) * 0.4;
+            let lat = coords[0] + latJitter; let lng = coords[1] + lngJitter;
+            let displayGroupName = (group.groupName && group.groupName !== '-') ? group.groupName : `กลุ่มที่ ${group.seq}`;
+            let displayNum = (group.members > 0) ? `${group.members} ราย` : 'ไม่ระบุ';
+            let tooltipHtml = `
+              <div style="padding: 12px; min-width: 180px;">
+                <div style="color: #047857; font-weight: 700; font-size: 14px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">${displayGroupName}</div>
+                <div style="font-size: 13px; color: #475569; line-height: 1.6;">
+                  <b>ตำบล:</b> ${group.tambon}<br><b>อำเภอ:</b> ${group.amphoe}<br><b>จังหวัด:</b> ${group.prov}<br><b>สมาชิก:</b> ${displayNum}
+                </div>
+              </div>`;
+            mapData.addRow([lat, lng, " ", 1, 1, tooltipHtml]); 
+          }
+        });
+
+        if (!hasData) mapData.addRow([13.7563, 100.5018, " ", 0, 0, `<div style="padding:10px;">ไม่พบข้อมูลกลุ่ม</div>`]);
+
+        var options = {
+          region: 'TH', displayMode: 'markers', colorAxis: {colors: ['#1b4321', '#265932']}, 
+          sizeAxis: { minValue: 1, maxValue: 1, minSize: 3, maxSize: 3 }, backgroundColor: 'transparent',
+          datalessRegionColor: 'transparent', tooltip: { isHtml: true, trigger: 'focus' }, magnifyingGlass: { enable: false }, legend: 'none' 
+        };
+        var chart = new google.visualization.GeoChart(document.getElementById('map_div'));
+        chart.draw(mapData, options);
+      }
+
+      function drawCropChart(sortedCrops) {
+        if (!isMapReady || sortedCrops.length === 0) {
+          document.getElementById('crop_chart_div').innerHTML = '<span class="text-slate-400 text-sm">ไม่มีข้อมูลชนิดพืชสำหรับการคำนวณกราฟ</span>'; return;
+        }
+        var chartData = new google.visualization.DataTable();
+        chartData.addColumn('string', 'ชนิดพืช'); chartData.addColumn('number', 'จำนวนเกษตรกร (ราย)'); chartData.addColumn({type: 'string', role: 'style'});
+
+        const barColors = ['#1abc9c', '#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c', '#34495e', '#16a085', '#27ae60', '#2980b9'];
+        sortedCrops.forEach((crop, index) => { chartData.addRow([crop.name, crop.value, barColors[index] || '#cbd5e1']); });
+
+        var options = {
+          fontName: 'Sarabun', 
+          backgroundColor: 'transparent', 
+          legend: { position: 'none' }, 
+          chartArea: { width: '65%', height: '75%', left: 120, top: 20 },
+          hAxis: { 
+            title: 'จำนวนเกษตรกร (ราย)', 
+            titleTextStyle: { fontSize: 12, bold: true, color: '#334155', italic: false }, 
+            textStyle: { fontSize: 11, color: '#475569' }, 
+            gridlines: { color: '#f1f5f9' }, 
+            minValue: 0,
+            slantedText: false
+          },
+          vAxis: { 
+            title: 'ชนิดพืชที่ปลูก',
+            titleTextStyle: { fontSize: 12, bold: true, color: '#334155', italic: false }, 
+            textStyle: { fontSize: 11, color: '#475569' } 
+          }, 
+          bar: { groupWidth: '65%' }
+        };
+        var chart = new google.visualization.BarChart(document.getElementById('crop_chart_div'));
+        chart.draw(chartData, options);
+      }
+
+      function drawStatusChart(statusCounts) {
+        if (!isMapReady || Object.keys(statusCounts).length === 0) {
+          document.getElementById('status_chart_div').innerHTML = '<span class="text-slate-400 text-sm">ไม่มีข้อมูลสถานะกลุ่มสำหรับการคำนวณกราฟ</span>'; return;
+        }
+        var chartData = new google.visualization.DataTable();
+        chartData.addColumn('string', 'สถานะ'); chartData.addColumn('number', 'จำนวนกลุ่ม');
+
+        let hasData = false;
+        Object.keys(statusCounts).forEach(key => { chartData.addRow([key, statusCounts[key]]); hasData = true; });
+
+        if (!hasData) { document.getElementById('status_chart_div').innerHTML = '<span class="text-slate-400 text-sm">ไม่มีข้อมูลสถานะกลุ่ม</span>'; return; }
+
+        var options = {
+          fontName: 'Sarabun', backgroundColor: 'transparent', pieHole: 0.35, chartArea: { width: '90%', height: '85%', top: 20 },
+          legend: { position: 'right', textStyle: { fontSize: 11, color: '#475569' } },
+          colors: ['#059669', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'], pieSliceTextStyle: { fontSize: 11 }
+        };
+        var chart = new google.visualization.PieChart(document.getElementById('status_chart_div'));
+        chart.draw(chartData, options);
+      }
+
+      function renderTable(data) {
+        const tbody = document.getElementById('table-body');
+        if (data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="14" class="text-center py-10 text-emerald-600 font-medium bg-emerald-50/30"><i class="fa-solid fa-magnifying-glass-minus text-2xl mb-2 block opacity-50"></i>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</td></tr>`; return;
+        }
+        const displayLimit = 200;
+        const displayData = data.slice(0, displayLimit);
+
+        tbody.innerHTML = displayData.map((row) => {
+          let roleInGroup = row['สถานะภายในกลุ่ม'] || '-';
+          let roleHtml = '-';
+          if (roleInGroup !== '-') {
+             let colorClass = roleInGroup.includes('ประธาน') ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200';
+             roleHtml = `<span class="${colorClass} px-2 py-0.5 rounded text-[10px] border font-medium">${roleInGroup}</span>`;
+          }
+          
+          return `
+          <tr class="hover:bg-emerald-50/50 transition duration-150">
+            <td class="px-4 py-2 font-medium">${row['สพข.'] || '-'}</td>
+            <td class="px-4 py-2">${row['สพด.'] || '-'}</td>
+            <td class="px-4 py-2 text-center text-blue-600 font-bold">${row['ลำดับ'] || '-'}</td>
+            <td class="px-4 py-2 text-center text-amber-600 font-semibold">${row['ลำดับสมาชิก_คำนวณ'] || '-'}</td>
+            <td class="px-4 py-2 text-emerald-700 font-semibold">${row['ชื่อกลุ่ม'] || '-'}</td>
+            <td class="px-4 py-2 text-center text-slate-500">${row['ปีที่เข้าร่วมโครงการ'] || '-'}</td>
+            <td class="px-4 py-2 text-slate-700 text-xs">${row['สถานะของกลุ่ม'] || '-'}</td>
+            <td class="px-4 py-2 text-center">${roleHtml}</td>
+            <td class="px-4 py-2 text-slate-600">${row['รายชื่อสมาชิก'] || '-'}</td>
+            <td class="px-4 py-2">${row['สถานะการเป็นหมอดินอาสา'] || '-'}</td>
+            <td class="px-4 py-2">${row['ตำบล'] || '-'}</td>
+            <td class="px-4 py-2">${row['อำเภอ'] || '-'}</td>
+            <td class="px-4 py-2">${row['จังหวัด'] || '-'}</td>
+            <td class="px-4 py-2 truncate max-w-[150px]" title="${row['ชนิดการทำการเกษตร'] || '-'}">${row['ชนิดการทำการเกษตร'] || '-'}</td>
+          </tr>`}).join('');
+
+        if (data.length > displayLimit) {
+           tbody.innerHTML += `<tr><td colspan="14" class="text-center py-4 text-emerald-700 font-medium bg-emerald-50 text-xs border-t border-emerald-200 shadow-inner">⚠️ แสดงผลข้อมูลบนเว็บไซต์เฉพาะ ${displayLimit} รายการแรกเพื่อความรวดเร็ว (จากข้อมูลทั้งหมด ${data.length.toLocaleString()} รายการ) - สามารถดาวน์โหลด Excel เพื่อดูทั้งหมดได้</td></tr>`;
+        }
+      }
+
+      function applyFilters() {
+        const qGroup = searchGroup.value.toLowerCase().trim();
+        const qFarmer = searchFarmer.value.toLowerCase().trim();
+        const vSpk = spkSelect.value;
+        const vSpd = spdSelect.value;
+        const vYear = yearSelect.value;
+
+        const filtered = globalData.filter(row => {
+          let isMatch = true;
+          if (qGroup && !(String(row['ชื่อกลุ่ม'] || '').toLowerCase().includes(qGroup))) isMatch = false;
+          if (qFarmer && !(String(row['รายชื่อสมาชิก'] || '').toLowerCase().includes(qFarmer))) isMatch = false;
+          
+          let isSpdMatch = true;
+          if (vSpd) {
+            const spdText = String(row['สพด.'] || '').replace(/\s+/g, ''); 
+            const provText = String(row['จังหวัด'] || '').replace(/\s+/g, ''); 
+            const vSpdClean = vSpd.replace(/[์]/g, ''); 
+            
+            let match = false;
+            if (spdText.includes(vSpd) || spdText.includes(vSpdClean)) {
+                match = true;
+            } 
+            else if (!spdText || spdText === '-' || spdText === 'ไม่ระบุ') {
+                if (provText.includes(vSpd) || provText.includes(vSpdClean)) match = true;
+            }
+
+            if (!match) isSpdMatch = false;
+          }
+          
+          if (vSpk && isMatch) { 
+            let rawSpk = String(row['สพข.'] || '');
+            rawSpk = rawSpk.replace(/[๐-๙]/g, c => '๐๑๒๓๔๕๖๗๘๙'.indexOf(c));
+            const sheetSpkNumber = rawSpk.replace(/\D/g,''); 
+            let matchSpk = false;
+            if (sheetSpkNumber === String(vSpk)) {
+              matchSpk = true;
+            } else {
+               const spdText = String(row['สพด.'] || '').replace(/\s+/g, '');
+               const provText = String(row['จังหวัด'] || '').replace(/\s+/g, '');
+               const expectedProvinces = regionData[vSpk] || [];
+               for (let p of expectedProvinces) {
+                  let pClean = p.replace(/[์]/g, '');
+                  if (spdText.includes(p) || provText.includes(p) || spdText.includes(pClean) || provText.includes(pClean)) {
+                     matchSpk = true; break;
+                  }
+               }
+            }
+            if (!matchSpk) isMatch = false;
+          }
+          if (!isSpdMatch) isMatch = false;
+          
+          if (vYear) {
+            let rowYear = String(row['ปีที่เข้าร่วมโครงการ'] || '');
+            if (vYear === "none" && rowYear && rowYear !== '-') isMatch = false;
+            if (vYear !== "none" && rowYear !== vYear) isMatch = false;
+          }
+          return isMatch;
+        });
+
+        currentFilteredData = filtered;
+        
+        let totalGroups = 0;
+        let totalFarmers = 0;
+        let mapPoints = [];
+        let cropCounts = {};
+        let statusCounts = {}; 
+
+        let processedGroups = new Set(); 
+
+        filtered.forEach(row => {
+          let grpNo = String(row['ลำดับ'] || '').replace(/\s+/g, '');
+          let spd = String(row['สพด.'] || '').trim();
+          let grpName = String(row['ชื่อกลุ่ม'] || '').trim();
+          let memberName = String(row['รายชื่อสมาชิก'] || '').trim();
+          
+          let uniqueGroupId = spd + "|" + grpNo;
+          let isValidGroupSeq = /^\d+$/.test(grpNo) && parseInt(grpNo, 10) > 0 && grpName !== "";
+
+          if (memberName !== "" && memberName !== "-") {
+              totalFarmers++;
+          }
+
+          let cropStr = String(row['ชนิดการทำการเกษตร'] || 'ไม่ระบุ').trim();
+          if (cropStr === '-' || cropStr === '') cropStr = 'ไม่ระบุ';
+          let cropArray = cropStr.split(/[,/、，\+]+/);
+          cropArray.forEach(crop => {
+            crop = crop.trim();
+            if (crop.includes('ผสมผสาน') || crop.includes('สวนผสม') || crop.includes('ทฤษฎีใหม่')) crop = 'เกษตรผสมผสาน';
+            else if (crop.includes('ข้าว') && !crop.includes('โพด')) crop = 'ข้าว';
+            else if (crop.includes('ผลไม้') || crop.includes('ไม้ผล')) crop = 'ไม้ผล';
+            else if (crop.includes('ผัก') || crop.includes('สวนครัว')) crop = 'พืชผัก';
+            else if (crop.includes('ยาง')) crop = 'ยางพารา';
+            else if (crop.includes('ปาล์ม')) crop = 'ปาล์มน้ำมัน';
+            else if (crop.includes('มันสำปะหลัง') || crop === 'มัน') crop = 'มันสำปะหลัง';
+            else if (crop.includes('อ้อย')) crop = 'อ้อย';
+            else if (crop.includes('สมุนไพร')) crop = 'พืชสมุนไพร';
+            else if (crop.includes('ทำนา')) crop = 'ข้าว';
+            if (crop === '-' || crop === '') crop = 'ไม่ระบุ';
+            
+            if (crop !== 'ไม่ระบุ') { 
+              if (!cropCounts[crop]) cropCounts[crop] = 0;
+              cropCounts[crop] += 1;
+            }
+          });
+
+          if (isValidGroupSeq && !processedGroups.has(uniqueGroupId)) {
+            processedGroups.add(uniqueGroupId);
+            totalGroups++;
+
+            let grpStatus = String(row['สถานะของกลุ่ม'] || '').trim();
+            if (grpStatus && grpStatus !== '-') {
+               let statuses = grpStatus.split(',');
+               statuses.forEach(s => {
+                  let st = s.trim();
+                  if (st) statusCounts[st] = (statusCounts[st] || 0) + 1;
+               });
+            } else {
+               statusCounts['ไม่ระบุสถานะ'] = (statusCounts['ไม่ระบุสถานะ'] || 0) + 1;
+            }
+
+            let provName = String(row['จังหวัด'] || '').trim();
+            if (!provName || provName === '-' || provName === 'ไม่ระบุ') {
+               provName = spd.replace('สพด.', '').trim();
+            }
+            provName = provName.replace('จังหวัด', '').replace('จ.', '').trim();
+            
+            let memberCountForMap = filtered.filter(r => (String(r['สพด.']||'').trim() + "|" + String(r['ลำดับ']||'').replace(/\s+/g, '')) === uniqueGroupId && String(r['รายชื่อสมาชิก']||'').trim() !== "").length;
+
+            mapPoints.push({
+               seq: grpNo,
+               groupName: grpName,
+               members: memberCountForMap, 
+               prov: provName,
+               tambon: String(row['ตำบล'] || '-').trim(),
+               amphoe: String(row['อำเภอ'] || '-').trim()
+            });
+          }
+        });
+
+        let sortedTopCrops = Object.keys(cropCounts)
+          .map(key => ({ name: key, value: cropCounts[key] }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 10);
+
+        document.getElementById('kpi-groups').innerText = totalGroups.toLocaleString();
+        document.getElementById('kpi-farmers').innerText = totalFarmers.toLocaleString(); 
+        
+        let displayCount = Math.min(filtered.length, 200);
+        document.getElementById('result-count').innerText = `พบข้อมูล ${filtered.length.toLocaleString()} รายการ (กำลังแสดงผล ${displayCount} รายการแรก)`;
+
+        renderTable(filtered);
+        drawMap(mapPoints); 
+        drawCropChart(sortedTopCrops);
+        drawStatusChart(statusCounts);
+      }
+
+      let typingTimer;
+      const doneTypingInterval = 500; 
+      function debouncedFilter() {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(applyFilters, doneTypingInterval);
+      }
+      searchGroup.addEventListener('input', debouncedFilter);
+      searchFarmer.addEventListener('input', debouncedFilter);
+      spdSelect.addEventListener('change', applyFilters);
+      yearSelect.addEventListener('change', applyFilters);
+
+      document.getElementById('btn-reset').addEventListener('click', function() {
+        searchGroup.value = ""; searchFarmer.value = ""; spkSelect.value = ""; yearSelect.value = "";
+        populateSpd(""); applyFilters();
+      });
+
+      document.getElementById('btn-export').addEventListener('click', function() {
+        if (currentFilteredData.length === 0) {
+          alert("ไม่พบข้อมูลสำหรับดาวน์โหลด กรุณาปรับเปลี่ยนตัวกรองข้อมูล"); return;
+        }
+        const originalText = this.innerHTML;
+        this.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> กำลังสร้างไฟล์...`;
+        
+        setTimeout(() => {
+          try {
+            const exportData = currentFilteredData.map(row => {
+              return {
+                "สพข.": row['สพข.'], "สพด.": row['สพด.'], "ลำดับของกลุ่ม": row['ลำดับ'], "ลำดับสมาชิก": row['ลำดับสมาชิก_คำนวณ'],
+                "ชื่อกลุ่ม": row['ชื่อกลุ่ม'], "ปีที่เข้าร่วมโครงการ": row['ปีที่เข้าร่วมโครงการ'], "สถานะของกลุ่ม": row['สถานะของกลุ่ม'] || '-', 
+                "สถานะภายในกลุ่ม": row['สถานะภายในกลุ่ม'] || '-', "รายชื่อสมาชิก": row['รายชื่อสมาชิก'], "สถานะการเป็นหมอดินอาสา": row['สถานะการเป็นหมอดินอาสา'],
+                "ตำบล": row['ตำบล'], "อำเภอ": row['อำเภอ'], "จังหวัด": row['จังหวัด'], "ชนิดการทำการเกษตร": row['ชนิดการทำการเกษตร']
+              };
+            });
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "ข้อมูลกลุ่มเกษตรกร");
+            XLSX.writeFile(workbook, "รายงานกลุ่มเกษตรกร_กรมพัฒนาที่ดิน.xlsx");
+          } catch (error) {
+            console.error(error); alert("เกิดข้อผิดพลาดในการสร้างไฟล์ Excel");
+          } finally {
+            this.innerHTML = originalText;
+          }
+        }, 300);
+      });
+
+      // === ลิงก์ Web App ของคุณ ===
+      const webAppUrl = "https://script.google.com/macros/s/AKfycbzc02cLan3Q7a2pczDtyED-ju6GLMxAG6a1sq2pFyuRWvl5jzz821bMFmeFFET44RVg/exec";
+
+      window.addEventListener('DOMContentLoaded', () => {
+        initMapZoomControl(); 
+        fetch(webAppUrl)
+          .then(response => {
+            if (!response.ok) throw new Error('การเชื่อมต่อล้มเหลว');
+            return response.json();
+          })
+          .then(data => {
+            
+            const cleanedData = data.filter(row => {
+                let seq = String(row['ลำดับ'] || '').replace(/\s+/g, '');
+                let spk = String(row['สพข.'] || '').trim();
+                let spd = String(row['สพด.'] || '').trim();
+                let group = String(row['ชื่อกลุ่ม'] || '').trim();
+                let member = String(row['รายชื่อสมาชิก'] || '').trim();
+
+                if (seq === 'ลำดับ' || group === 'ชื่อกลุ่ม' || spk === 'สพข.') return false;
+                if (!seq && !spk && !group && !member && !spd) return false;
+                if (seq !== "" && !/^\d+$/.test(seq)) return false;
+
+                let gNoSpace = group.replace(/\s+/g, '');
+                if (gNoSpace.includes('รวมทั้งหมด') || gNoSpace.includes('รวมทั้งสิ้น') || gNoSpace.includes('รวมสพ') || gNoSpace.includes('รวมเขต') || /รวม.*กลุ่ม/.test(gNoSpace)) return false;
+
+                if (group.startsWith('รวม')) {
+                    let validRuam = ['รวมใจ', 'รวมพลัง', 'รวมกลุ่ม', 'รวมมิตร', 'รวมพัฒนา', 'รวมเกษตร', 'รวมทรัพย์'];
+                    let isValid = validRuam.some(v => group.includes(v));
+                    if (!isValid && member === '') return false;
+                }
+
+                if (seq !== "" && group === "") {
+                    if (member === "") return false;
+                    row['ลำดับ'] = "";
+                }
+
+                return true;
+            });
+
+            let finalData = [];
+            let currentMemberSequence = 0;
+            let previousGroupId = "";
+
+            cleanedData.forEach(row => {
+                let grpNo = String(row['ลำดับ'] || '').replace(/\s+/g, '');
+                let spd = String(row['สพด.'] || '').trim();
+                let member = String(row['รายชื่อสมาชิก'] || '').trim();
+
+                let currentGroupId = spd + "|" + grpNo;
+                let isValidGroupRow = /^\d+$/.test(grpNo); 
+
+                if (isValidGroupRow && currentGroupId !== previousGroupId) {
+                    currentMemberSequence = 1; 
+                    previousGroupId = currentGroupId;
+                } 
+                else if (member !== "" && member !== "-") {
+                    currentMemberSequence++; 
+                } 
+                else {
+                    if (currentMemberSequence === 0) currentMemberSequence = 1;
+                }
+                
+                row['ลำดับสมาชิก_คำนวณ'] = currentMemberSequence;
+                finalData.push(row);
+            });
+
+            globalData = finalData; 
+            
+            const statusBox = document.getElementById('data-status');
+            statusBox.className = "py-2 px-4 text-emerald-700 bg-emerald-100 rounded-lg border border-emerald-300 text-xs font-medium flex items-center justify-between";
+            statusBox.innerHTML = `<span><i class="fa-solid fa-circle-check text-emerald-600 text-sm mr-2"></i> โหลดข้อมูลจาก Google Sheets สำเร็จ</span> <span class="bg-emerald-200 px-2 py-0.5 rounded text-[10px]">สถานะ: ออนไลน์</span>`;
+            
+            applyFilters(); 
+          })
+          .catch(error => {
+            const statusBox = document.getElementById('data-status');
+            statusBox.className = "py-3 px-4 text-rose-700 bg-rose-50 rounded-lg border border-rose-200 text-xs font-medium flex items-center gap-2";
+            statusBox.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i> ไม่สามารถเชื่อมต่อกับ Google Sheets ได้ กรุณาตรวจสอบลิงก์ Web App`;
+            document.getElementById('table-body').innerHTML = '<tr><td colspan="14" class="text-center py-10 text-rose-500 font-medium">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+          });
+      });
+    </script>
+  </body>
+</html>
