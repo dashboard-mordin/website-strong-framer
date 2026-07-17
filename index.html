@@ -296,29 +296,37 @@
       let currentFilteredData = []; 
       let isMapReady = false; 
 
-      let mapZoom = 1;
+      // --- ตั้งค่า Zoom เริ่มต้น (1.5 เท่า) ---
+      let defaultMapZoom = 1.5;
+      let mapZoom = defaultMapZoom;
       let mapPanX = 0;
-      let mapPanY = 0;
+      let mapPanY = 20; // ปรับลงมาเล็กน้อยให้พอดีกับ 1.5 เท่า
       let isMapDragging = false;
       let mapStartX = 0;
       let mapStartY = 0;
 
-      function initMapZoomControl() {
-        const mapWrapper = document.getElementById('map_wrapper');
+      function applyMapTransform(smooth = true) {
         const mapDiv = document.getElementById('map_div');
-        function applyTransform(smooth = true) {
+        if (mapDiv) {
           mapDiv.style.transition = smooth ? 'transform 0.2s ease-out' : 'none';
           mapDiv.style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapZoom})`;
         }
-        document.getElementById('btn-zoom-in').addEventListener('click', () => { mapZoom = Math.min(mapZoom + 0.5, 6); applyTransform(); });
-        document.getElementById('btn-zoom-out').addEventListener('click', () => { mapZoom = Math.max(mapZoom - 0.5, 1); if (mapZoom === 1) { mapPanX = 0; mapPanY = 0; } applyTransform(); });
-        document.getElementById('btn-zoom-reset').addEventListener('click', () => { mapZoom = 1; mapPanX = 0; mapPanY = 0; applyTransform(); });
+      }
+
+      function initMapZoomControl() {
+        const mapWrapper = document.getElementById('map_wrapper');
+        const mapDiv = document.getElementById('map_div');
+        
+        document.getElementById('btn-zoom-in').addEventListener('click', () => { mapZoom = Math.min(mapZoom + 0.5, 6); applyMapTransform(); });
+        document.getElementById('btn-zoom-out').addEventListener('click', () => { mapZoom = Math.max(mapZoom - 0.5, 1); if (mapZoom === 1) { mapPanX = 0; mapPanY = 0; } applyMapTransform(); });
+        document.getElementById('btn-zoom-reset').addEventListener('click', () => { mapZoom = defaultMapZoom; mapPanX = 0; mapPanY = 20; applyMapTransform(); });
+        
         mapWrapper.addEventListener('wheel', (e) => {
           e.preventDefault(); 
           if (e.deltaY < 0) mapZoom = Math.min(mapZoom + 0.25, 6);
           else mapZoom = Math.max(mapZoom - 0.25, 1);
           if (mapZoom === 1) { mapPanX = 0; mapPanY = 0; }
-          applyTransform();
+          applyMapTransform();
         }, { passive: false });
 
         mapWrapper.addEventListener('mousedown', (e) => {
@@ -329,15 +337,17 @@
         });
         mapWrapper.addEventListener('mousemove', (e) => {
           if (!isMapDragging) return;
-          mapPanX = e.clientX - mapStartX; mapPanY = e.clientY - mapStartY; applyTransform(false); 
+          mapPanX = e.clientX - mapStartX; mapPanY = e.clientY - mapStartY; applyMapTransform(false); 
         });
         const stopDrag = () => {
           if (isMapDragging) {
-            isMapDragging = false; mapDiv.classList.remove('cursor-grabbing'); mapDiv.classList.add('cursor-grab'); applyTransform(true);
+            isMapDragging = false; mapDiv.classList.remove('cursor-grabbing'); mapDiv.classList.add('cursor-grab'); applyMapTransform(true);
           }
         };
         mapWrapper.addEventListener('mouseup', stopDrag);
         mapWrapper.addEventListener('mouseleave', stopDrag);
+        
+        applyMapTransform(); 
       }
 
       google.charts.load('current', { 'packages':['geochart', 'corechart'] });
@@ -403,6 +413,7 @@
         };
         var chart = new google.visualization.GeoChart(document.getElementById('map_div'));
         chart.draw(mapData, options);
+        applyMapTransform(false);
       }
 
       function drawCropChart(sortedCrops) {
@@ -443,18 +454,32 @@
         if (!isMapReady || Object.keys(statusCounts).length === 0) {
           document.getElementById('status_chart_div').innerHTML = '<span class="text-slate-400 text-sm">ไม่มีข้อมูลสถานะกลุ่มสำหรับการคำนวณกราฟ</span>'; return;
         }
+        
+        let sortedStatus = Object.keys(statusCounts)
+          .map(key => ({ name: key, value: statusCounts[key] }))
+          .sort((a, b) => b.value - a.value);
+
         var chartData = new google.visualization.DataTable();
-        chartData.addColumn('string', 'สถานะ'); chartData.addColumn('number', 'จำนวนกลุ่ม');
+        chartData.addColumn('string', 'สถานะ'); 
+        chartData.addColumn('number', 'จำนวนกลุ่ม');
 
         let hasData = false;
-        Object.keys(statusCounts).forEach(key => { chartData.addRow([key, statusCounts[key]]); hasData = true; });
+        sortedStatus.forEach(item => { 
+          chartData.addRow([item.name, item.value]); 
+          hasData = true; 
+        });
 
         if (!hasData) { document.getElementById('status_chart_div').innerHTML = '<span class="text-slate-400 text-sm">ไม่มีข้อมูลสถานะกลุ่ม</span>'; return; }
 
         var options = {
-          fontName: 'Sarabun', backgroundColor: 'transparent', pieHole: 0.35, chartArea: { width: '90%', height: '85%', top: 20 },
+          fontName: 'Sarabun', 
+          backgroundColor: 'transparent', 
+          pieHole: 0.35, 
+          chartArea: { width: '90%', height: '85%', top: 20 },
           legend: { position: 'right', textStyle: { fontSize: 11, color: '#475569', italic: false } },
-          colors: ['#059669', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'], pieSliceTextStyle: { fontSize: 11 }
+          colors: ['#059669', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'], 
+          pieSliceText: 'percentage', 
+          pieSliceTextStyle: { fontSize: 12, bold: true }
         };
         var chart = new google.visualization.PieChart(document.getElementById('status_chart_div'));
         chart.draw(chartData, options);
