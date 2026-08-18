@@ -9,10 +9,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     
+    <!-- ไลบรารี Leaflet.js สำหรับแผนที่แบบ Interactive (Google Maps Style) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
       
-      /* การตั้งค่าพื้นหลังสไตล์ GAP */
       body { 
         font-family: 'Sarabun', sans-serif; 
         background: linear-gradient(135deg, #f4f7f6 0%, #e8ecef 100%);
@@ -32,27 +35,6 @@
       .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 2px solid #f1f5f9; }
       .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-      /* แก้ปัญหากราฟกระพริบ: ให้เมาส์ทะลุตัวหนังสือในกราฟไปโดนตัวกราฟโดยตรง */
-      svg text {
-        pointer-events: none !important;
-      }
-
-      .google-visualization-tooltip { 
-        font-family: 'Sarabun', sans-serif !important; 
-        padding: 12px !important; 
-        border-radius: 8px !important; 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; 
-        border: 1px solid #e2e8f0 !important;
-        background-color: white !important;
-        z-index: 50 !important;
-        pointer-events: none !important; /* แก้ Tooltip กระพริบ */
-      }
-      ul.google-visualization-tooltip-item-list { margin: 0 !important; padding: 0 !important; list-style: none !important; }
-      .google-visualization-tooltip-item:first-child { display: none !important; }
-
-      /* ================================== 
-         สไตล์การ์ดข้อมูลและกราฟ (จาก GAP) 
-      ==================================== */
       .styled-card {
         background: linear-gradient(180deg, #ffffff 0%, #f1f8e9 100%);
         border-radius: 15px;
@@ -67,16 +49,27 @@
         border-top: 5px solid #265932;
       }
 
-      .map-pattern::before {
-        content: ""; position: absolute; top: 10%; left: 5%; width: 90%; height: 80%;
-        background-image: url('https://www.transparenttextures.com/patterns/antique-paper.png'); 
-        opacity: 0.05; pointer-events: none;
-      }
-
       .custom-thead th {
         background-color: #265932 !important;
         color: #fffdf2 !important;
         border: 1px solid rgba(255,255,255,0.1) !important;
+      }
+
+      .custom-hover-tooltip {
+        background-color: rgba(255, 255, 255, 0.96) !important;
+        border: 2px solid #eab308 !important; 
+        border-radius: 12px !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+        padding: 12px 16px !important;
+        font-family: 'Sarabun', sans-serif !important;
+        white-space: nowrap !important;
+      }
+      .custom-hover-tooltip::before {
+        border-top-color: #eab308 !important;
+      }
+      .leaflet-container {
+        font-family: 'Sarabun', sans-serif !important;
+        z-index: 10 !important;
       }
     </style>
   </head>
@@ -162,20 +155,10 @@
         <div class="styled-card p-6 flex flex-col relative">
           <h4 class="text-sm font-semibold text-[#1b4321] mb-4 border-b border-emerald-100 pb-2 flex justify-between">
             <span><i class="fa-solid fa-map-location-dot mr-2 text-emerald-600"></i>แผนที่พิกัดกระจายตัวกลุ่มเกษตรกร</span>
-            <span class="text-xs text-slate-400 font-normal"><i class="fa-solid fa-mouse mr-1"></i>เลื่อนลูกกลิ้งเพื่อซูม / คลิกค้างเพื่อลากเลื่อนแผนที่</span>
+            <span class="text-xs text-slate-400 font-normal"><i class="fa-solid fa-mouse mr-1"></i>เลื่อนลูกกลิ้งเพื่อซูม / ชี้เมาส์ที่หมุดเพื่อดูข้อมูล</span>
           </h4>
           
-          <div id="map_wrapper" class="w-full h-96 relative overflow-hidden map-pattern rounded-lg select-none flex items-center justify-center">
-            <div class="absolute top-3 right-3 z-10 flex flex-col bg-white rounded shadow-md border border-slate-200">
-              <button id="btn-zoom-in" class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition border-b border-slate-200" title="ซูมเข้า"><i class="fa-solid fa-plus"></i></button>
-              <button id="btn-zoom-reset" class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition border-b border-slate-200" title="คืนค่าเดิม"><i class="fa-solid fa-compress"></i></button>
-              <button id="btn-zoom-out" class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition" title="ซูมออก"><i class="fa-solid fa-minus"></i></button>
-            </div>
-            
-            <div id="map_div" class="w-full max-w-[400px] mx-auto h-full cursor-grab" style="transform-origin: center center; transition: transform 0.2s ease-out;">
-              <span class="text-slate-400 text-sm flex items-center justify-center h-full w-full absolute top-0 left-0"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังเตรียมแผนที่...</span>
-            </div>
-          </div>
+          <div id="map_div" class="w-full h-[500px] rounded-lg shadow-inner border border-slate-200 z-10" style="background-color: #e5e7eb;"></div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -240,12 +223,13 @@
     </main>
 
     <script>
+      // +++ ปรับพิกัดศูนย์กลางจังหวัดริมอ่าวไทย ให้ดันขึ้นเหนือ(แผ่นดิน) อีก 3-5 กิโลเมตร เพื่อความชัวร์ +++
       const provLatLng = {
-        "กรุงเทพมหานคร": [13.7563, 100.5018], "สมุทรปราการ": [13.5991, 100.5968], "นนทบุรี": [13.8591, 100.5217],
+        "กรุงเทพมหานคร": [13.7800, 100.5018], "สมุทรปราการ": [13.6200, 100.6000], "นนทบุรี": [13.8591, 100.5217],
         "ปทุมธานี": [14.0208, 100.5250], "พระนครศรีอยุธยา": [14.3516, 100.5774], "อ่างทอง": [14.5896, 100.4550],
         "ลพบุรี": [14.7985, 100.6540], "สิงห์บุรี": [14.8936, 100.4047], "ชัยนาท": [15.1852, 100.1251],
-        "สระบุรี": [14.5289, 100.9101], "ชลบุรี": [13.3611, 100.9847], "ระยอง": [12.6814, 101.2816],
-        "จันทบุรี": [12.6114, 102.1039], "ตราด": [12.2428, 102.5175], "ฉะเชิงเทรา": [13.6904, 101.0718],
+        "สระบุรี": [14.5289, 100.9101], "ชลบุรี": [13.3800, 101.0000], "ระยอง": [12.7100, 101.2816],
+        "จันทบุรี": [12.6300, 102.1039], "ตราด": [12.2600, 102.5175], "ฉะเชิงเทรา": [13.6904, 101.0718],
         "ปราจีนบุรี": [14.0510, 101.3722], "นครนายก": [14.2069, 101.2131], "สระแก้ว": [13.8240, 102.0646],
         "นครราชสีมา": [14.9799, 102.0978], "บุรีรัมย์": [14.9930, 103.1029], "สุรินทร์": [14.8818, 103.4936],
         "ศรีสะเกษ": [15.1186, 104.3220], "อุบลราชธานี": [15.2448, 104.8473], "ยโสธร": [15.7926, 104.1453],
@@ -260,13 +244,147 @@
         "อุทัยธานี": [15.3835, 100.0246], "กำแพงเพชร": [16.4828, 99.5227], "ตาก": [16.8840, 99.1258],
         "สุโขทัย": [17.0116, 99.8251], "พิษณุโลก": [16.8211, 100.2587], "พิจิตร": [16.4419, 100.3488],
         "เพชรบูรณ์": [16.4150, 101.1560], "ราชบุรี": [13.5283, 99.8128], "กาญจนบุรี": [14.0228, 99.5328],
-        "สุพรรณบุรี": [14.4742, 100.1123], "นครปฐม": [13.8199, 100.0668], "สมุทรสาคร": [13.5475, 100.2744],
-        "สมุทรสงคราม": [13.4140, 100.0011], "เพชรบุรี": [13.1119, 99.9447], "ประจวบคีรีขันธ์": [11.8105, 99.7971],
+        "สุพรรณบุรี": [14.4742, 100.1123], "นครปฐม": [13.8199, 100.0668], "สมุทรสาคร": [13.5700, 100.2744],
+        "สมุทรสงคราม": [13.4300, 100.0011], "เพชรบุรี": [13.1119, 99.9447], "ประจวบคีรีขันธ์": [11.8023, 99.7963],
         "นครศรีธรรมราช": [8.4304, 99.9631], "กระบี่": [8.0863, 98.9063], "พังงา": [8.4501, 98.5284],
         "ภูเก็ต": [7.8804, 98.3923], "สุราษฎร์ธานี": [9.1342, 99.3334], "ระนอง": [9.9658, 98.6348],
         "ชุมพร": [10.4930, 99.1800], "สงขลา": [7.1898, 100.5954], "สตูล": [6.6226, 100.0667],
         "ตรัง": [7.5563, 99.6114], "พัทลุง": [7.6166, 100.0740], "ปัตตานี": [6.8660, 101.2501],
         "ยะลา": [6.5411, 101.2804], "นราธิวาส": [6.4255, 101.8253]
+      };
+
+      // +++ อัปเดตพิกัดรายอำเภอให้ครอบคลุมจังหวัดชายฝั่ง และดันพิกัดลึกเข้าบกป้องกันตกทะเล +++
+      const amphoeLatLng = {
+        // --- สมุทรสาคร ---
+        "เมืองสมุทรสาคร_สมุทรสาคร": [13.5700, 100.2744],
+        "เมือง_สมุทรสาคร": [13.5700, 100.2744],
+        "กระทุ่มแบน_สมุทรสาคร": [13.6544, 100.2691],
+        "บ้านแพ้ว_สมุทรสาคร": [13.5855, 100.1119],
+        
+        // --- สมุทรสงคราม ---
+        "เมืองสมุทรสงคราม_สมุทรสงคราม": [13.4300, 100.0011],
+        "เมือง_สมุทรสงคราม": [13.4300, 100.0011],
+        "อัมพวา_สมุทรสงคราม": [13.4244, 99.9547],
+        "บางคนที_สมุทรสงคราม": [13.4733, 99.9389],
+
+        // --- สมุทรปราการ ---
+        "เมืองสมุทรปราการ_สมุทรปราการ": [13.6200, 100.6000],
+        "เมือง_สมุทรปราการ": [13.6200, 100.6000],
+        "บางพลี_สมุทรปราการ": [13.6050, 100.7100],
+        "พระประแดง_สมุทรปราการ": [13.6550, 100.5340],
+        "พระสมุทรเจดีย์_สมุทรปราการ": [13.5900, 100.5750],
+        "บางบ่อ_สมุทรปราการ": [13.5802, 100.8354],
+        "บางเสาธง_สมุทรปราการ": [13.5920, 100.8240],
+
+        // --- ระยอง ---
+        "เมืองระยอง_ระยอง": [12.7100, 101.2800],
+        "เมือง_ระยอง": [12.7100, 101.2800],
+        "แกลง_ระยอง": [12.7788, 101.6508],
+        "บ้านค่าย_ระยอง": [12.7844, 101.2934],
+        "บ้านฉาง_ระยอง": [12.7265, 101.0558],
+        "ปลวกแดง_ระยอง": [12.9733, 101.2133],
+        "วังจันทร์_ระยอง": [12.9233, 101.5233],
+        "เขาชะเมา_ระยอง": [13.0133, 101.7133],
+        "นิคมพัฒนา_ระยอง": [12.8333, 101.2033],
+
+        // --- ชลบุรี ---
+        "เมืองชลบุรี_ชลบุรี": [13.3800, 100.9847],
+        "เมือง_ชลบุรี": [13.3800, 100.9847],
+        "ศรีราชา_ชลบุรี": [13.1700, 100.9400],
+        "บางละมุง_ชลบุรี": [12.9806, 100.9150],
+        "สัตหีบ_ชลบุรี": [12.7500, 100.9100],
+        "พานทอง_ชลบุรี": [13.4688, 101.0970],
+        "พนัสนิคม_ชลบุรี": [13.4475, 101.1824],
+        "บ้านบึง_ชลบุรี": [13.3108, 101.1130],
+        "หนองใหญ่_ชลบุรี": [13.1611, 101.3789],
+        "เกาะจันทร์_ชลบุรี": [13.4072, 101.3175],
+        "บ่อทอง_ชลบุรี": [13.2800, 101.4422],
+
+        // --- เพชรบุรี ---
+        "เมืองเพชรบุรี_เพชรบุรี": [13.1200, 99.9447],
+        "เมือง_เพชรบุรี": [13.1200, 99.9447],
+        "เขาย้อย_เพชรบุรี": [13.2392, 99.8247],
+        "หนองหญ้าปล้อง_เพชรบุรี": [13.1558, 99.7027],
+        "ชะอำ_เพชรบุรี": [12.8100, 99.9500],
+        "ท่ายาง_เพชรบุรี": [12.9669, 99.8978],
+        "บ้านลาด_เพชรบุรี": [13.0645, 99.9324],
+        "บ้านแหลม_เพชรบุรี": [13.2037, 99.9827],
+        "แก่งกระจาน_เพชรบุรี": [12.9114, 99.6450],
+
+        // --- ประจวบคีรีขันธ์ ---
+        "เมืองประจวบคีรีขันธ์_ประจวบคีรีขันธ์": [11.8200, 99.7800],
+        "เมือง_ประจวบคีรีขันธ์": [11.8200, 99.7800],
+        "สามร้อยยอด_ประจวบคีรีขันธ์": [12.2355, 99.9329],
+        "ปราณบุรี_ประจวบคีรีขันธ์": [12.3857, 99.9079],
+        "กุยบุรี_ประจวบคีรีขันธ์": [12.0838, 99.8540],
+        "ทับสะแก_ประจวบคีรีขันธ์": [11.4988, 99.6247],
+        "บางสะพาน_ประจวบคีรีขันธ์": [11.2144, 99.5100],
+        "บางสะพานน้อย_ประจวบคีรีขันธ์": [11.0772, 99.4449],
+        "หัวหิน_ประจวบคีรีขันธ์": [12.5694, 99.9575],
+
+        // --- จันทบุรี ---
+        "เมืองจันทบุรี_จันทบุรี": [12.6114, 102.1039],
+        "เมือง_จันทบุรี": [12.6114, 102.1039],
+        "ท่าใหม่_จันทบุรี": [12.6200, 101.9961],
+        "ขลุง_จันทบุรี": [12.4552, 102.2223],
+        "แหลมสิงห์_จันทบุรี": [12.4820, 102.0729],
+        "โป่งน้ำร้อน_จันทบุรี": [12.9056, 102.3275],
+        "มะขาม_จันทบุรี": [12.6739, 102.1931],
+
+        // --- ตราด ---
+        "เมืองตราด_ตราด": [12.2428, 102.5175],
+        "เมือง_ตราด": [12.2428, 102.5175],
+        "คลองใหญ่_ตราด": [11.7770, 102.8833],
+        "เขาสมิง_ตราด": [12.3508, 102.4497],
+        "แหลมงอบ_ตราด": [12.1706, 102.3948],
+        "บ่อไร่_ตราด": [12.5700, 102.5350],
+
+        // --- ชุมพร ---
+        "เมืองชุมพร_ชุมพร": [10.4930, 99.1800],
+        "เมือง_ชุมพร": [10.4930, 99.1800],
+        "ปะทิว_ชุมพร": [10.7161, 99.3178],
+        "ท่าแซะ_ชุมพร": [10.6690, 99.0189],
+        "สวี_ชุมพร": [10.3752, 99.1121],
+        "ละแม_ชุมพร": [9.7610, 99.0883],
+        "หลังสวน_ชุมพร": [9.9431, 99.0786],
+        "ทุ่งตะโก_ชุมพร": [10.1111, 99.0967],
+
+        // --- สุราษฎร์ธานี ---
+        "เมืองสุราษฎร์ธานี_สุราษฎร์ธานี": [9.1342, 99.3334],
+        "เมือง_สุราษฎร์ธานี": [9.1342, 99.3334],
+        "ดอนสัก_สุราษฎร์ธานี": [9.3197, 99.6914],
+        "ไชยา_สุราษฎร์ธานี": [9.3860, 99.1953],
+        "ท่าฉาง_สุราษฎร์ธานี": [9.2662, 99.1969],
+        "พุนพิน_สุราษฎร์ธานี": [9.1081, 99.2319],
+        "กาญจนดิษฐ์_สุราษฎร์ธานี": [9.1672, 99.4715],
+        
+        // --- นครศรีธรรมราช ---
+        "เมืองนครศรีธรรมราช_นครศรีธรรมราช": [8.4304, 99.9631],
+        "เมือง_นครศรีธรรมราช": [8.4304, 99.9631],
+        "ปากพนัง_นครศรีธรรมราช": [8.3541, 100.2030],
+        "สิชล_นครศรีธรรมราช": [8.9950, 99.8974],
+        "ท่าศาลา_นครศรีธรรมราช": [8.6669, 99.9328],
+        "หัวไทร_นครศรีธรรมราช": [8.0319, 100.2972],
+        "ขนอม_นครศรีธรรมราช": [9.2025, 99.8617],
+        
+        // --- สงขลา ---
+        "เมืองสงขลา_สงขลา": [7.1898, 100.5954],
+        "เมือง_สงขลา": [7.1898, 100.5954],
+        "จะนะ_สงขลา": [6.9161, 100.7336], 
+        "เทพา_สงขลา": [6.8288, 100.9638],
+        "สิงหนคร_สงขลา": [7.2185, 100.5369],
+        "ระโนด_สงขลา": [7.7877, 100.3204],
+        "สทิงพระ_สงขลา": [7.4711, 100.4386],
+        "หาดใหญ่_สงขลา": [7.0096, 100.4735],
+
+        // --- พื้นที่เกษตรหนาแน่น (ภาคกลางตอนล่าง/ตะวันตก) ---
+        "นครชัยศรี_นครปฐม": [13.8017, 100.1856],
+        "สามพราน_นครปฐม": [13.7258, 100.2183],
+        "บางเลน_นครปฐม": [14.0206, 100.1661],
+        "กำแพงแสน_นครปฐม": [14.0042, 99.9825],
+        "ดำเนินสะดวก_เพชรบุรี": [13.5186, 99.9622], // (ราชบุรี แต่บางทีลงเพชรบุรี)
+        "ดำเนินสะดวก_ราชบุรี": [13.5186, 99.9622],
+        "บางแพ_ชลบุรี": [13.2981, 101.2183]
       };
 
       const regionData = {
@@ -294,67 +412,27 @@
       
       let globalData = []; 
       let currentFilteredData = []; 
-      let isMapReady = false; 
+      
+      let leafletMap = null;
+      let markerLayer = null;
+      let isMapReady = false;
 
-      // --- ตั้งค่า Zoom เริ่มต้น (1.5 เท่า) ---
-      let defaultMapZoom = 1.5;
-      let mapZoom = defaultMapZoom;
-      let mapPanX = 0;
-      let mapPanY = 20; 
-      let isMapDragging = false;
-      let mapStartX = 0;
-      let mapStartY = 0;
-
-      function applyMapTransform(smooth = true) {
-        const mapDiv = document.getElementById('map_div');
-        if (mapDiv) {
-          mapDiv.style.transition = smooth ? 'transform 0.2s ease-out' : 'none';
-          mapDiv.style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapZoom})`;
-        }
-      }
-
-      function initMapZoomControl() {
-        const mapWrapper = document.getElementById('map_wrapper');
-        const mapDiv = document.getElementById('map_div');
-        
-        document.getElementById('btn-zoom-in').addEventListener('click', () => { mapZoom = Math.min(mapZoom + 0.5, 6); applyMapTransform(); });
-        document.getElementById('btn-zoom-out').addEventListener('click', () => { mapZoom = Math.max(mapZoom - 0.5, 1); if (mapZoom === 1) { mapPanX = 0; mapPanY = 0; } applyMapTransform(); });
-        document.getElementById('btn-zoom-reset').addEventListener('click', () => { mapZoom = defaultMapZoom; mapPanX = 0; mapPanY = 20; applyMapTransform(); });
-        
-        mapWrapper.addEventListener('wheel', (e) => {
-          e.preventDefault(); 
-          if (e.deltaY < 0) mapZoom = Math.min(mapZoom + 0.25, 6);
-          else mapZoom = Math.max(mapZoom - 0.25, 1);
-          if (mapZoom === 1) { mapPanX = 0; mapPanY = 0; }
-          applyMapTransform();
-        }, { passive: false });
-
-        mapWrapper.addEventListener('mousedown', (e) => {
-          if (mapZoom > 1) {
-            isMapDragging = true; mapStartX = e.clientX - mapPanX; mapStartY = e.clientY - mapPanY;
-            mapDiv.classList.remove('cursor-grab'); mapDiv.classList.add('cursor-grabbing');
-          }
-        });
-        mapWrapper.addEventListener('mousemove', (e) => {
-          if (!isMapDragging) return;
-          mapPanX = e.clientX - mapStartX; mapPanY = e.clientY - mapStartY; applyMapTransform(false); 
-        });
-        const stopDrag = () => {
-          if (isMapDragging) {
-            isMapDragging = false; mapDiv.classList.remove('cursor-grabbing'); mapDiv.classList.add('cursor-grab'); applyMapTransform(true);
-          }
-        };
-        mapWrapper.addEventListener('mouseup', stopDrag);
-        mapWrapper.addEventListener('mouseleave', stopDrag);
-        
-        applyMapTransform(); 
-      }
-
-      google.charts.load('current', { 'packages':['geochart', 'corechart'] });
+      google.charts.load('current', { 'packages':['corechart'] });
       google.charts.setOnLoadCallback(function() {
-        isMapReady = true;
-        if(globalData.length > 0) applyFilters(); 
+        initLeafletMap(); 
       });
+
+      function initLeafletMap() {
+        leafletMap = L.map('map_div').setView([13.7563, 100.5018], 5);
+        
+        L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+            maxZoom: 18,
+            attribution: '© Google'
+        }).addTo(leafletMap);
+
+        markerLayer = L.layerGroup().addTo(leafletMap);
+        isMapReady = true;
+      }
 
       for (let i = 1; i <= 12; i++) {
         let opt = document.createElement('option'); opt.value = i; opt.textContent = `สพข.${i}`; spkSelect.appendChild(opt);
@@ -376,44 +454,93 @@
       spkSelect.addEventListener('change', function() { populateSpd(this.value); applyFilters(); });
       populateSpd("");
 
-      function drawMap(mapPointsArray) {
-        if (!isMapReady) return;
-        var mapData = new google.visualization.DataTable();
-        mapData.addColumn('number', 'Latitude'); mapData.addColumn('number', 'Longitude');
-        mapData.addColumn('string', 'Label'); mapData.addColumn('number', 'Color'); mapData.addColumn('number', 'Size');   
-        mapData.addColumn({'type': 'string', 'role': 'tooltip', 'p': {'html': true}}); 
+      function getOffsetHash(str) {
+          let hash = 0;
+          if (!str) return 0;
+          for (let i = 0; i < str.length; i++) {
+              hash = str.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          return hash;
+      }
 
-        let hasData = false;
+      function drawMap(mapPointsArray, targetCoords = null) {
+        if (!leafletMap) return;
+        
+        markerLayer.clearLayers();
+
         mapPointsArray.forEach(group => {
-          if (provLatLng[group.prov]) {
-            hasData = true;
-            let coords = provLatLng[group.prov];
-            let latJitter = (Math.random() - 0.5) * 0.4; 
-            let lngJitter = (Math.random() - 0.5) * 0.4;
-            let lat = coords[0] + latJitter; let lng = coords[1] + lngJitter;
+          let provClean = group.prov.trim();
+          let amphoeClean = group.amphoe.replace('อำเภอ', '').replace('อ.', '').trim();
+          let amProvKey = amphoeClean + "_" + provClean;
+          
+          let baseCoords = amphoeLatLng[amProvKey] || provLatLng[provClean];
+
+          if (baseCoords) {
+            let hashLat = getOffsetHash(group.amphoe + "lat" + group.tambon);
+            let hashLng = getOffsetHash(group.amphoe + "lng" + group.tambon);
+            
+            let isAmphoeLevel = !!amphoeLatLng[amProvKey];
+            
+            // +++ ลดรัศมีการกระจายตัวลงแบบสุดๆ (บีบอัดให้อยู่เป็นกระจุก) +++
+            // อำเภอ: รัศมี ~600 เมตร | จังหวัด: รัศมี ~1.5 กม.
+            let scatterRadius = isAmphoeLevel ? 0.006 : 0.015; 
+            
+            let latOffset = ((Math.abs(hashLat) % 100) / 100) * (scatterRadius * 2) - scatterRadius;
+            let lngOffset = ((Math.abs(hashLng) % 100) / 100) * (scatterRadius * 2) - scatterRadius;
+            
+            // +++ คำสั่งพิเศษ: ถ้าเป็นจังหวัดเสี่ยงริมอ่าวไทย บังคับให้หมุดหนีขึ้นทิศเหนือ (เข้าแผ่นดิน) เสมอ +++
+            let coastalProvinces = ['ระยอง', 'สมุทรสาคร', 'สมุทรสงคราม', 'สมุทรปราการ', 'ชลบุรี', 'เพชรบุรี', 'ตราด', 'จันทบุรี'];
+            if (coastalProvinces.includes(provClean)) {
+                latOffset = Math.abs(latOffset); // ทำให้ค่าแนวตั้งเป็น + เสมอ (ขยับขึ้นบก)
+            }
+            
+            let tinyJitterLat = (Math.random() - 0.5) * 0.005;
+            let tinyJitterLng = (Math.random() - 0.5) * 0.005;
+
+            let lat = baseCoords[0] + latOffset + tinyJitterLat; 
+            let lng = baseCoords[1] + lngOffset + tinyJitterLng;
+
             let displayGroupName = (group.groupName && group.groupName !== '-') ? group.groupName : `กลุ่มที่ ${group.seq}`;
             let displayNum = (group.members > 0) ? `${group.members} ราย` : 'ไม่ระบุ';
+            
             let tooltipHtml = `
-              <div style="padding: 12px; min-width: 180px;">
-                <div style="color: #047857; font-weight: 700; font-size: 14px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">${displayGroupName}</div>
+              <div style="text-align: left;">
+                <div style="color: #a16207; font-weight: 700; font-size: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+                    <i class="fa-solid fa-users mr-1"></i> ${displayGroupName}
+                </div>
                 <div style="font-size: 13px; color: #475569; line-height: 1.6;">
-                  <b>ตำบล:</b> ${group.tambon}<br><b>อำเภอ:</b> ${group.amphoe}<br><b>จังหวัด:</b> ${group.prov}<br><b>สมาชิก:</b> ${displayNum}
+                  <span style="display:inline-block; width:45px; font-weight:600;">ตำบล:</span> ${group.tambon}<br>
+                  <span style="display:inline-block; width:45px; font-weight:600;">อำเภอ:</span> ${group.amphoe}<br>
+                  <span style="display:inline-block; width:45px; font-weight:600;">จังหวัด:</span> ${group.prov}<br>
+                  <span style="display:inline-block; width:45px; font-weight:600;">สมาชิก:</span> <span style="color:#a16207; font-weight:bold;">${displayNum}</span>
                 </div>
               </div>`;
-            mapData.addRow([lat, lng, " ", 1, 1, tooltipHtml]); 
+
+            let marker = L.circleMarker([lat, lng], {
+                radius: 6, // ปรับวงกลมเล็กลงนิดนึงให้ดูไม่แน่นจนเกินไป
+                fillColor: "#facc15", 
+                color: "#a16207",     
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.9
+            });
+
+            marker.bindTooltip(tooltipHtml, {
+                direction: 'top',
+                offset: [0, -10],
+                className: 'custom-hover-tooltip', 
+                opacity: 1
+            });
+            
+            marker.addTo(markerLayer);
           }
         });
 
-        if (!hasData) mapData.addRow([13.7563, 100.5018, " ", 0, 0, `<div style="padding:10px;">ไม่พบข้อมูลกลุ่ม</div>`]);
-
-        var options = {
-          region: 'TH', displayMode: 'markers', colorAxis: {colors: ['#1b4321', '#265932']}, 
-          sizeAxis: { minValue: 1, maxValue: 1, minSize: 3, maxSize: 3 }, backgroundColor: 'transparent',
-          datalessRegionColor: 'transparent', tooltip: { isHtml: true, trigger: 'focus' }, magnifyingGlass: { enable: false }, legend: 'none' 
-        };
-        var chart = new google.visualization.GeoChart(document.getElementById('map_div'));
-        chart.draw(mapData, options);
-        applyMapTransform(false);
+        if (targetCoords) {
+            leafletMap.flyTo(targetCoords, 9, { duration: 1.5 }); // ซูมเจาะลึกจังหวัดขึ้นอีก 1 ระดับ
+        } else {
+            leafletMap.flyTo([13.7563, 100.5018], 6, { duration: 1.5 }); // ซูมเจาะประเทศไทยขึ้นอีก 1 ระดับ
+        }
       }
 
       function drawCropChart(sortedCrops) {
@@ -490,7 +617,7 @@
         if (data.length === 0) {
           tbody.innerHTML = `<tr><td colspan="14" class="text-center py-10 text-emerald-600 font-medium bg-emerald-50/30"><i class="fa-solid fa-magnifying-glass-minus text-2xl mb-2 block opacity-50"></i>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</td></tr>`; return;
         }
-        const displayLimit = 200;
+        const displayLimit = 232;
         const displayData = data.slice(0, displayLimit);
 
         tbody.innerHTML = displayData.map((row) => {
@@ -530,6 +657,14 @@
         const vSpk = spkSelect.value;
         const vSpd = spdSelect.value;
         const vYear = yearSelect.value;
+
+        let targetCoords = null;
+        if (vSpd) {
+            let provClean = vSpd.replace('สพด.', '').replace('จังหวัด', '').replace('จ.', '').trim();
+            if (provLatLng[provClean]) {
+                targetCoords = provLatLng[provClean];
+            }
+        }
 
         const filtered = globalData.filter(row => {
           let isMatch = true;
@@ -671,11 +806,13 @@
         document.getElementById('kpi-groups').innerText = totalGroups.toLocaleString();
         document.getElementById('kpi-farmers').innerText = totalFarmers.toLocaleString(); 
         
-        let displayCount = Math.min(filtered.length, 200);
+        let displayCount = Math.min(filtered.length, 232);
         document.getElementById('result-count').innerText = `พบข้อมูล ${filtered.length.toLocaleString()} รายการ (กำลังแสดงผล ${displayCount} รายการแรก)`;
 
         renderTable(filtered);
-        drawMap(mapPoints); 
+        
+        drawMap(mapPoints, targetCoords); 
+        
         drawCropChart(sortedTopCrops);
         drawStatusChart(statusCounts);
       }
@@ -725,11 +862,9 @@
         }, 300);
       });
 
-      // === ลิงก์ Web App ของคุณ ===
       const webAppUrl = "https://script.google.com/macros/s/AKfycbzc02cLan3Q7a2pczDtyED-ju6GLMxAG6a1sq2pFyuRWvl5jzz821bMFmeFFET44RVg/exec";
 
       window.addEventListener('DOMContentLoaded', () => {
-        initMapZoomControl(); 
         fetch(webAppUrl)
           .then(response => {
             if (!response.ok) throw new Error('การเชื่อมต่อล้มเหลว');
@@ -737,12 +872,10 @@
           })
           .then(data => {
             
-            // 1. นำระบบแก้ไขเครื่องหมาย " กลับมาไว้ในส่วนแรกของการดึงข้อมูล
             let prevRowData = {};
             data.forEach(row => {
                 Object.keys(row).forEach(key => {
                     let val = String(row[key]).trim();
-                    // ตรวจสอบเครื่องหมายฟันหนู หรือขีดละ
                     if (val === '"' || val === '”' || val === '“' || val === '""' || val === "''" || val === "'") {
                         row[key] = prevRowData[key] || '';
                     } else if (val !== "") {
@@ -812,9 +945,19 @@
             statusBox.className = "py-2 px-4 text-emerald-700 bg-emerald-100 rounded-lg border border-emerald-300 text-xs font-medium flex items-center justify-between";
             statusBox.innerHTML = `<span><i class="fa-solid fa-circle-check text-emerald-600 text-sm mr-2"></i> โหลดข้อมูลจาก Google Sheets สำเร็จ</span> <span class="bg-emerald-200 px-2 py-0.5 rounded text-[10px]">สถานะ: ออนไลน์</span>`;
             
-            applyFilters(); 
+            if (isMapReady) {
+               applyFilters(); 
+            } else {
+               let checkMap = setInterval(() => {
+                  if (isMapReady) {
+                     clearInterval(checkMap);
+                     applyFilters();
+                  }
+               }, 100);
+            }
           })
           .catch(error => {
+            console.error("Fetch error:", error);
             const statusBox = document.getElementById('data-status');
             statusBox.className = "py-3 px-4 text-rose-700 bg-rose-50 rounded-lg border border-rose-200 text-xs font-medium flex items-center gap-2";
             statusBox.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i> ไม่สามารถเชื่อมต่อกับ Google Sheets ได้ กรุณาตรวจสอบลิงก์ Web App`;
